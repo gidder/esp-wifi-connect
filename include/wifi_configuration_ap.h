@@ -2,11 +2,14 @@
 #define _WIFI_CONFIGURATION_AP_H_
 
 #include <string>
+#include <vector>
+#include <mutex>
 #include <esp_http_server.h>
 #include <esp_event.h>
 #include <esp_timer.h>
 #include "dns_server.h"
 #include <esp_netif.h>
+#include <esp_wifi_types_generic.h>
 
 class WifiConfigurationAp {
 public:
@@ -29,6 +32,7 @@ private:
     WifiConfigurationAp();
     ~WifiConfigurationAp();
 
+    std::mutex mutex_aps;
     DnsServer dns_server_;
     httpd_handle_t server_ = NULL;
     EventGroupHandle_t event_group_;
@@ -39,6 +43,7 @@ private:
     esp_timer_handle_t scan_timer_ = nullptr;
     bool is_connecting_ = false;
     esp_netif_t* ap_netif_ = nullptr;
+    std::vector<wifi_ap_record_t> ap_records_;
 
     void StartAccessPoint();
     void StartWebServer();

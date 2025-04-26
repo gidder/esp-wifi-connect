@@ -96,8 +96,6 @@ void WifiConfigurationAp::Start()
         .skip_unhandled_events = true
     };
     ESP_ERROR_CHECK(esp_timer_create(&timer_args, &scan_timer_));
-    // Start scanning every 10 seconds
-    // ESP_ERROR_CHECK(esp_timer_start_periodic(scan_timer_, 10000000));
 }
 
 std::string WifiConfigurationAp::GetSsid()
@@ -171,7 +169,7 @@ void WifiConfigurationAp::StartWebServer()
 {
     // Start the web server
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 20;
+    config.max_uri_handlers = 24;
     config.uri_match_fn = httpd_uri_match_wildcard;
     ESP_ERROR_CHECK(httpd_start(&server_, &config));
 
@@ -256,42 +254,29 @@ void WifiConfigurationAp::StartWebServer()
         .uri = "/scan",
         .method = HTTP_GET,
         .handler = [](httpd_req_t *req) -> esp_err_t {
-            uint16_t ap_num = 0;
-            esp_wifi_scan_get_ap_num(&ap_num);
-
-            if (ap_num == 0) {
-                ESP_LOGI(TAG, "No APs found, scanning...");
-                esp_wifi_scan_start(nullptr, true);
-                esp_wifi_scan_get_ap_num(&ap_num);
-            }
-
-            auto ap_records = std::make_unique<wifi_ap_record_t[]>(ap_num);
-            if (!ap_records) {
-                return ESP_FAIL;
-            }
-            esp_wifi_scan_get_ap_records(&ap_num, ap_records.get());
+            auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
+            std::lock_guard<std::mutex> lock(this_->mutex_aps);
 
             // Send the scan results as JSON
             httpd_resp_set_type(req, "application/json");
             httpd_resp_sendstr_chunk(req, "[");
-            for (int i = 0; i < ap_num; i++) {
-                ESP_LOGI(TAG, "SSID: %s, RSSI: %d, Authmode: %d",
-                    (char *)ap_records[i].ssid, ap_records[i].rssi, ap_records[i].authmode);
+            for (int i = 0; i < this_->ap_records_.size(); i++) {
+                ESP_LOGI(TAG, "SSID: %s, RSSI: %d, Authmode: %d, Channel: %d",
+                    (char *)this_->ap_records_[i].ssid, this_->ap_records_[i].rssi, this_->ap_records_[i].authmode, this_->ap_records_[i].primary);
                 char buf[128];
                 snprintf(buf, sizeof(buf), "{\"ssid\":\"%s\",\"rssi\":%d,\"authmode\":%d}",
-                    (char *)ap_records[i].ssid, ap_records[i].rssi, ap_records[i].authmode);
+                    (char *)this_->ap_records_[i].ssid, this_->ap_records_[i].rssi, this_->ap_records_[i].authmode);
                 httpd_resp_sendstr_chunk(req, buf);
-                if (i < ap_num - 1) {
+                if (i < this_->ap_records_.size() - 1) {
                     httpd_resp_sendstr_chunk(req, ",");
                 }
             }
             httpd_resp_sendstr_chunk(req, "]");
             httpd_resp_sendstr_chunk(req, NULL);
 
-            esp_wifi_scan_start(nullptr, false);
             return ESP_OK;
         },
-        .user_ctx = NULL
+        .user_ctx = this
     };
     ESP_ERROR_CHECK(httpd_register_uri_handler(server_, &scan));
 
@@ -530,7 +515,15 @@ void WifiConfigurationAp::WifiEventHandler(void* arg, esp_event_base_t event_bas
         xEventGroupSetBits(self->event_group_, WIFI_CONNECTED_BIT);
     } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
         xEventGroupSetBits(self->event_group_, WIFI_FAIL_BIT);
-    } 
+    } else if (event_id == WIFI_EVENT_SCAN_DONE) {
+        std::lock_guard<std::mutex> lock(self->mutex_aps);
+        uint16_t ap_num = 0;
+        esp_wifi_scan_get_ap_num(&ap_num);
+        self->ap_records_.resize(ap_num);
+        esp_wifi_scan_get_ap_records(&ap_num, self->ap_records_.data());
+
+        esp_timer_start_once(self->scan_timer_, 5 * 1000000);
+    }
 }
 
 void WifiConfigurationAp::IpEventHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -621,17 +614,6 @@ void WifiConfigurationAp::Stop() {
     // 停止DNS服务器
     dns_server_.Stop();
 
-    // 释放网络接口资源
-    if (ap_netif_) {
-        esp_netif_destroy(ap_netif_);
-        ap_netif_ = nullptr;
-    }
-
-    // 停止WiFi并重置模式
-    esp_wifi_stop();
-    esp_wifi_deinit();
-    esp_wifi_set_mode(WIFI_MODE_NULL);
-
     // 注销事件处理器
     if (instance_any_id_) {
         esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id_);
@@ -642,5 +624,15 @@ void WifiConfigurationAp::Stop() {
         instance_got_ip_ = nullptr;
     }
 
+    // 停止WiFi并重置模式
+    esp_wifi_stop();
+    esp_wifi_deinit();
+    esp_wifi_set_mode(WIFI_MODE_NULL);
+
+    // 释放网络接口资源
+    if (ap_netif_) {
+        esp_netif_destroy(ap_netif_);
+        ap_netif_ = nullptr;
+    }
     ESP_LOGI(TAG, "Wifi configuration AP stopped");
 }
