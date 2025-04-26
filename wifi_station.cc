@@ -129,6 +129,9 @@ void WifiStation::HandleScanResult() {
         auto it = std::find_if(ssid_list.begin(), ssid_list.end(), [ap_record](const SsidItem& item) {
             return strcmp((char *)ap_record.ssid, item.ssid.c_str()) == 0;
         });
+        ESP_LOGI(TAG, "SSID filter: %s, RSSI: %d, Authmode: %d, Channel: %d, it: %d",
+            (char *)ap_records[i].ssid, ap_records[i].rssi, ap_records[i].authmode, ap_records[i].primary, it != ssid_list.end());
+        // if (ap_record.authmode == wifi_auth_mode_t::WIFI_AUTH_ENTERPRISE) {}
         if (it != ssid_list.end()) {
             ESP_LOGI(TAG, "Found AP: %s, BSSID: %02x:%02x:%02x:%02x:%02x:%02x, RSSI: %d, Channel: %d, Authmode: %d",
                 (char *)ap_record.ssid, 
@@ -139,7 +142,8 @@ void WifiStation::HandleScanResult() {
                 .ssid = it->ssid,
                 .password = it->password,
                 .channel = ap_record.primary,
-                .authmode = ap_record.authmode
+                .authmode = ap_record.authmode,
+                .bssid = 0,
             };
             memcpy(record.bssid, ap_record.bssid, 6);
             connect_queue_.push_back(record);
@@ -149,7 +153,7 @@ void WifiStation::HandleScanResult() {
 
     if (connect_queue_.empty()) {
         ESP_LOGI(TAG, "Wait for next scan");
-        esp_timer_start_once(timer_handle_, 10 * 1000);
+        esp_timer_start_once(timer_handle_, 10 * 1000);  // 0.01 seconds
         return;
     }
 
@@ -226,7 +230,7 @@ void WifiStation::WifiEventHandler(void* arg, esp_event_base_t event_base, int32
         }
         
         ESP_LOGI(TAG, "No more AP to connect, wait for next scan");
-        esp_timer_start_once(this_->timer_handle_, 10 * 1000);
+        esp_timer_start_once(this_->timer_handle_, 10 * 1000);  // 0.01 seconds
     } else if (event_id == WIFI_EVENT_STA_CONNECTED) {
     }
 }

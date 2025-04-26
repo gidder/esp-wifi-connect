@@ -333,7 +333,7 @@ void WifiConfigurationAp::StartWebServer()
                 }
 
                 cJSON_Delete(json);
-                httpd_resp_send(req, "{\"success\":false,\"error\":\"无效的 SSID\"}", HTTPD_RESP_USE_STRLEN);
+                httpd_resp_send(req, ("{\"success\":false,\"error\":" + error_str + "}").c_str(), HTTPD_RESP_USE_STRLEN);
                 return ESP_OK;
             }
 
@@ -429,6 +429,7 @@ void WifiConfigurationAp::StartWebServer()
     const char* captive_portal_urls[] = {
         "/hotspot-detect.html",    // Apple
         "/generate_204",           // Android
+        "/gen_204",                // Android
         "/mobile/status.php",      // Android
         "/check_network_status.txt", // Windows
         "/ncsi.txt",              // Windows

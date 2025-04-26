@@ -10,6 +10,11 @@ Here is a screenshot of the web server:
 
 ![Access Point Configuration](assets/ap_v2.png)
 
+## Changelog: v2.3.6
+
+- Sanitize web input
+- Update AP lst handling according base repo
+
 ## Changelog: v2.3.5
 
 - More stable list of APs on configuration web
