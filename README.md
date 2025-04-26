@@ -10,6 +10,11 @@ Here is a screenshot of the web server:
 
 ![Access Point Configuration](assets/ap_v2.png)
 
+## Changelog: v2.3.5
+
+- More stable list of APs on configuration web
+- Dont stop refresh AP list in configuration web
+
 ## Changelog: v2.3.4
 
 - Set English as default language.
