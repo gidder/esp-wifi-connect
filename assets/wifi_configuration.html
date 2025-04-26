@@ -145,7 +145,7 @@
             // 检查语言值是否合法
             if (!translations[lang]) {
                 console.warn(`不支持的语言: ${lang}，默认使用中文`);
-                document.getElementById('language').value = 'zh-CN';
+                document.getElementById('language').value = 'en-US';
                 return changeLanguage();
             }
             
@@ -263,7 +263,7 @@
             const langParam = urlParams.get('lang');
             
             // 优先使用 URL 参数的语言设置，其次是本地存储的设置，最后默认使用中文
-            const savedLang = langParam || localStorage.getItem('preferred_language') || 'zh-CN';
+            const savedLang = langParam || localStorage.getItem('preferred_language') || 'en-US';
             document.getElementById('language').value = savedLang;
             changeLanguage();
             loadSavedList();
