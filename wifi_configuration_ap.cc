@@ -97,7 +97,7 @@ void WifiConfigurationAp::Start()
     };
     ESP_ERROR_CHECK(esp_timer_create(&timer_args, &scan_timer_));
     // Start scanning every 10 seconds
-    ESP_ERROR_CHECK(esp_timer_start_periodic(scan_timer_, 10000000));
+    // ESP_ERROR_CHECK(esp_timer_start_periodic(scan_timer_, 10000000));
 }
 
 std::string WifiConfigurationAp::GetSsid()
@@ -287,6 +287,8 @@ void WifiConfigurationAp::StartWebServer()
             }
             httpd_resp_sendstr_chunk(req, "]");
             httpd_resp_sendstr_chunk(req, NULL);
+
+            esp_wifi_scan_start(nullptr, false);
             return ESP_OK;
         },
         .user_ctx = NULL
