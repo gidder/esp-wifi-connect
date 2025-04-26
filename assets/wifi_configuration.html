@@ -227,6 +227,7 @@
         // Load AP list from /scan
         function loadAPList() {
             if (button.disabled) {
+                setTimeout(loadAPList, 5000)
                 return;
             }
 
