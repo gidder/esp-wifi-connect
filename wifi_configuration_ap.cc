@@ -334,7 +334,15 @@ void WifiConfigurationAp::StartWebServer()
             cJSON *ssid_item = cJSON_GetObjectItemCaseSensitive(json, "ssid");
             cJSON *password_item = cJSON_GetObjectItemCaseSensitive(json, "password");
 
+            auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
             if (!cJSON_IsString(ssid_item) || (ssid_item->valuestring == NULL)) {
+                std::string error_str = "";
+                if (this_->language_ == "zh-CN") {
+                    error_str = "\"无效的 SSID\"";
+                } else {
+                    error_str = "\"Invalid SSID\"";
+                }
+
                 cJSON_Delete(json);
                 httpd_resp_send(req, "{\"success\":false,\"error\":\"无效的 SSID\"}", HTTPD_RESP_USE_STRLEN);
                 return ESP_OK;
@@ -347,10 +355,15 @@ void WifiConfigurationAp::StartWebServer()
             }
 
             // 获取当前对象
-            auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
             if (!this_->ConnectToWifi(ssid_str, password_str)) {
+                std::string error_str = "";
+                if (this_->language_ == "zh-CN") {
+                    error_str = "\"无法连接到 WiFi\"";
+                } else {
+                    error_str = "\"Unable to connect to WiFi\"";
+                }
                 cJSON_Delete(json);
-                httpd_resp_send(req, "{\"success\":false,\"error\":\"无法连接到 WiFi\"}", HTTPD_RESP_USE_STRLEN);
+                httpd_resp_send(req, ("{\"success\":false,\"error\":" + error_str + "}").c_str(), HTTPD_RESP_USE_STRLEN);
                 return ESP_OK;
             }
 

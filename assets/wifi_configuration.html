@@ -128,7 +128,8 @@
                 new_wifi: '新的 WiFi',
                 password: '密码:',
                 connect: '连接',
-                select_wifi: '从下面列表选择 2.4G WiFi:'
+                select_wifi: '从下面列表选择 2.4G WiFi:',
+                connection_failed: '连接失败',
             },
             'en-US': {
                 title: 'WiFi Configuration',
@@ -136,7 +137,8 @@
                 new_wifi: 'New WiFi',
                 password: 'Password:',
                 connect: 'Connect',
-                select_wifi: 'Select an 2.4G WiFi from the list below:'
+                select_wifi: 'Select an 2.4G WiFi from the list below:',
+                connection_failed: 'Connection failed',
             }
         };
 
@@ -293,7 +295,8 @@
             };
 
             try {
-                const response = await fetch('/submit', {
+                const lang = document.getElementById('language').value;
+                const response = await fetch('/submit?lang=' + lang, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -303,7 +306,7 @@
 
                 const data = await response.json();
                 if (!data.success) {
-                    throw new Error(data.error || '连接失败');
+                    throw new Error(data.error || translations[lang]["connection_failed"]);
                 }
 
                 // 连接成功，跳转到完成页面
