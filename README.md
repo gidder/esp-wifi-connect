@@ -10,6 +10,11 @@ Here is a screenshot of the web server:
 
 ![Access Point Configuration](assets/ap_v2.png)
 
+## Changelog: v2.3.4
+
+- Set English as default language.
+- More English translations
+
 ## Changelog: v2.3.0
 
 - Add support for language request.
