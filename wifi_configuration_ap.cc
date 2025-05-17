@@ -169,6 +169,17 @@ void WifiConfigurationAp::StartWebServer()
 {
     // Start the web server
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+#if CONFIG_HTTPD_MAX_REQ_HDR_LEN < 1024
+    #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
+    if (config.max_req_hdr_len < 1024) {
+        config.max_req_hdr_len = 1024;
+    }
+    #else
+        #error "Use ESP-IDF SDK Version 5.5.0 or higher, or set CONFIG_HTTPD_MAX_REQ_HDR_LEN to at least 1024"
+    #endif
+#endif
+
     config.max_uri_handlers = 24;
     config.uri_match_fn = httpd_uri_match_wildcard;
     ESP_ERROR_CHECK(httpd_start(&server_, &config));
