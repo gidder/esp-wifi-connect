@@ -6,6 +6,6 @@ files:
   - .git
   - dist
 license: MIT
-repository: https://github.com/78/esp-wifi-connect
-url: https://github.com/78/esp-wifi-connect
-version: 2.3.6
+repository: https://github.com/gidder/esp-wifi-connect
+url: https://github.com/gidder/esp-wifi-connect
+version: 2.3.7
