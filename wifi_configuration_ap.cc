@@ -484,6 +484,7 @@ bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::stri
         return false;
     }
     
+    esp_timer_stop(scan_timer_);
     is_connecting_ = true;
     esp_wifi_scan_stop();
     xEventGroupClearBits(event_group_, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
@@ -500,6 +501,7 @@ bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::stri
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to connect to WiFi: %d", ret);
         is_connecting_ = false;
+        esp_wifi_scan_start(nullptr, false);
         return false;
     }
     ESP_LOGI(TAG, "Connecting to WiFi %s", ssid.c_str());
@@ -514,6 +516,7 @@ bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::stri
         return true;
     } else {
         ESP_LOGE(TAG, "Failed to connect to WiFi %s", ssid.c_str());
+        esp_wifi_scan_start(nullptr, false);
         return false;
     }
 }
