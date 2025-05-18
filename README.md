@@ -80,5 +80,5 @@ Changelog at [CHANGELOG.md][changelog]
 
 [origin]: https://github.com/78/esp-wifi-connect
 [changelog]: CHANGELOG.md
-[image]: assets/ap_v2.png
+[image]: assets/ap_list.png
 [header_length]: https://github.com/tonyp7/esp32-wifi-manager/issues/147

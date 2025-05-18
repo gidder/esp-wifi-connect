@@ -1,6 +1,22 @@
 
 # Changelog
 
+## [2.3.8] - 2025-05-18
+
+### Added
+
+- Filter APs with the same name
+- Filter Enterprise authentication APs
+
+### Changed
+
+- Default name set to ESP32
+- Rework APs list view
+
+### Fixed
+
+- Refreash APs after entering wrong password
+
 ## [2.3.7] - 2025-05-17
 
 ### Added
