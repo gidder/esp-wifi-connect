@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "wifi_configuration_ap.h"
 #include <cstdio>
 #include <memory>
@@ -33,6 +34,7 @@ WifiConfigurationAp::WifiConfigurationAp()
 {
     event_group_ = xEventGroupCreate();
     language_ = "en-US";
+    ssid_prefix_ = "ESP32";
 }
 
 WifiConfigurationAp::~WifiConfigurationAp()
@@ -268,21 +270,22 @@ void WifiConfigurationAp::StartWebServer()
         .method = HTTP_GET,
         .handler = [](httpd_req_t *req) -> esp_err_t {
             auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
-            std::lock_guard<std::mutex> lock(this_->mutex_aps);
+            std::lock_guard<std::mutex> lock(this_->mutex_aps_);
 
             // Send the scan results as JSON
             httpd_resp_set_type(req, "application/json");
             httpd_resp_sendstr_chunk(req, "[");
-            for (int i = 0; i < this_->ap_records_.size(); i++) {
-                ESP_LOGI(TAG, "SSID: %s, RSSI: %d, Authmode: %d, Channel: %d",
-                    (char *)this_->ap_records_[i].ssid, this_->ap_records_[i].rssi, this_->ap_records_[i].authmode, this_->ap_records_[i].primary);
+            bool first = true;
+            for (const auto & ap : this_->ap_records_) {
+                ESP_LOGI(TAG, "SCAN: SSID: %s, RSSI: %d, Authmode: %d", (char *)ap.ssid, ap.rssi, ap.authmode);
                 char buf[128];
                 snprintf(buf, sizeof(buf), "{\"ssid\":\"%s\",\"rssi\":%d,\"authmode\":%d}",
-                    (char *)this_->ap_records_[i].ssid, this_->ap_records_[i].rssi, this_->ap_records_[i].authmode);
-                httpd_resp_sendstr_chunk(req, buf);
-                if (i < this_->ap_records_.size() - 1) {
+                    (char *)ap.ssid, ap.rssi, ap.authmode);
+                if (!first) {
                     httpd_resp_sendstr_chunk(req, ",");
                 }
+                first = false;
+                httpd_resp_sendstr_chunk(req, buf);
             }
             httpd_resp_sendstr_chunk(req, "]");
             httpd_resp_sendstr_chunk(req, NULL);
@@ -535,11 +538,40 @@ void WifiConfigurationAp::WifiEventHandler(void* arg, esp_event_base_t event_bas
     } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
         xEventGroupSetBits(self->event_group_, WIFI_FAIL_BIT);
     } else if (event_id == WIFI_EVENT_SCAN_DONE) {
-        std::lock_guard<std::mutex> lock(self->mutex_aps);
+        if (self->is_connecting_) {
+            esp_wifi_clear_ap_list();
+            return;
+        }
+        std::lock_guard<std::mutex> lock(self->mutex_aps_);
         uint16_t ap_num = 0;
         esp_wifi_scan_get_ap_num(&ap_num);
-        self->ap_records_.resize(ap_num);
-        esp_wifi_scan_get_ap_records(&ap_num, self->ap_records_.data());
+        self->ap_records_.reserve(ap_num);
+        self->ap_records_.clear();
+        for (int i = 0; i < ap_num; i++) {
+            wifi_ap_record_t ap;
+            if (self->is_connecting_) {
+                ESP_LOGW(TAG, "Connecting during SCAN_DONE process %d/%d. Interupting build ap_records_", i, ap_num);
+                esp_wifi_clear_ap_list();
+                self->ap_records_.clear();
+                return;
+            }
+            ESP_ERROR_CHECK(esp_wifi_scan_get_ap_record(&ap));
+            ESP_LOGI(TAG, "BUILD: SSID: %s, RSSI: %d, Authmode: %d, Channel: %d",
+                (char *)ap.ssid, ap.rssi, ap.authmode, ap.primary);
+
+            auto exist = std::find_if(self->ap_records_.begin(), self->ap_records_.end(),
+                                      [&ap](const wifi_ap_record_min_t& x) { return strcmp((const char *)x.ssid, (const char *)ap.ssid) == 0; });
+            if (exist == self->ap_records_.end()) {
+                self->ap_records_.emplace_back(ap);
+            } else {  // Update existing AP with the strongest encryption and signal
+                if (exist->authmode < ap.authmode || exist->rssi < ap.rssi) {
+                    exist->authmode = ap.authmode;
+                    exist->rssi = ap.rssi;
+                }
+            }
+
+        }
+        std::sort(self->ap_records_.begin(), self->ap_records_.end(), wifi_ap_record_min_cmp{});
 
         esp_timer_start_once(self->scan_timer_, 5 * 1000000);
     }

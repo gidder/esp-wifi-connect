@@ -11,6 +11,31 @@
 #include <esp_netif.h>
 #include <esp_wifi_types_generic.h>
 
+
+/**
+  * @brief Minitmal description of a Wi-Fi AP
+  */
+ typedef struct wifi_ap_record_min_t {
+    uint8_t ssid[33];                     /**< SSID of AP */
+    int8_t  rssi;                         /**< Signal strength of AP. Note that in some rare cases where signal strength is very strong, RSSI values can be slightly positive */
+    wifi_auth_mode_t authmode;            /**< Auth mode of AP */
+
+    wifi_ap_record_min_t(wifi_ap_record_t& other)
+        : rssi(other.rssi), authmode(other.authmode)
+    {
+        strlcpy((char *)ssid, (const char *)other.ssid, 32);
+    }
+} wifi_ap_record_min_t;
+
+typedef struct 
+{
+    bool operator()(const wifi_ap_record_min_t& lhs, const wifi_ap_record_min_t& rhs) const
+    {
+        return lhs.rssi > rhs.rssi;
+    }
+} wifi_ap_record_min_cmp;
+ 
+
 class WifiConfigurationAp {
 public:
     static WifiConfigurationAp& GetInstance();
@@ -32,7 +57,7 @@ private:
     WifiConfigurationAp();
     ~WifiConfigurationAp();
 
-    std::mutex mutex_aps;
+    std::mutex mutex_aps_;
     DnsServer dns_server_;
     httpd_handle_t server_ = NULL;
     EventGroupHandle_t event_group_;
@@ -43,7 +68,7 @@ private:
     esp_timer_handle_t scan_timer_ = nullptr;
     bool is_connecting_ = false;
     esp_netif_t* ap_netif_ = nullptr;
-    std::vector<wifi_ap_record_t> ap_records_;
+    std::vector<wifi_ap_record_min_t> ap_records_;
 
     void StartAccessPoint();
     void StartWebServer();
