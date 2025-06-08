@@ -13,6 +13,7 @@
             background-color: #f0f0f0;
         }
         h1 {
+            margin-top: 40px;
             text-align: center;
         }
         form {
@@ -104,15 +105,14 @@
 <body>
     <div class="language-switch">
         <select id="language" onchange="changeLanguage()">
-            <option value="zh-CN">中文</option>
-            <option value="en-US">English</option>
+            <option value="">文A</option>
         </select>
     </div>
     
-    <h1 data-lang="title">WiFi 配置</h1>
+    <h1 data-lang="title">WiFi Configuration</h1>
     <form action="/submit" method="post" onsubmit="submitForm(event)">
         <div id="saved_list_container" style="display: none;">
-            <h3 data-lang="saved_wifi">已保存的 WiFi</h3>
+            <h3 data-lang="saved_wifi">Saved WiFi</h3>
             <ul id="saved_list">
                 <li>
                     <span>SSID</span>
@@ -120,7 +120,7 @@
             </ul>
         </div>
         <div>
-            <h3 data-lang="new_wifi">新的 WiFi</h3>
+            <h3 data-lang="new_wifi">New WiFi</h3>
             <p class="error" style="color: red; text-align: center;" id="error">
             </p>
             <p>
@@ -128,11 +128,11 @@
                 <input type="text" id="ssid" name="ssid" required>
             </p>
             <p>
-                <label for="password" data-lang="password">密码:</label>
+                <label for="password" data-lang="password">Password:</label>
                 <input type="password" id="password" name="password">
             </p>
             <p style="text-align: center;">
-                <input type="submit" value="连接" id="button" data-lang-value="connect">
+                <input type="submit" value="Connect" id="button" data-lang-value="connect">
             </p>
             <div id="ap_list">
                 Scanning ...
@@ -140,40 +140,27 @@
         </div>
     </form>
 
+    <script type="text/javascript" src="languages.js"></script>
     <script type="text/javascript">
         const button = document.getElementById('button');
         const error = document.getElementById('error');
         const ssid = document.getElementById('ssid');
 
-        // Add language translations
-        const translations = {
-            'zh-CN': {
-                title: 'WiFi 配置',
-                saved_wifi: '已保存的 WiFi',
-                new_wifi: '新的 WiFi',
-                password: '密码:',
-                connect: '连接',
-                select_wifi: '从下面列表选择 2.4G WiFi:',
-                connection_failed: '连接失败',
-            },
-            'en-US': {
-                title: 'WiFi Configuration',
-                saved_wifi: 'Saved WiFi',
-                new_wifi: 'New WiFi',
-                password: 'Password:',
-                connect: 'Connect',
-                select_wifi: 'Select an 2.4G WiFi from the list below:',
-                connection_failed: 'Connection failed',
-            }
-        };
-
         function changeLanguage() {
-            const lang = document.getElementById('language').value;
-            // 检查语言值是否合法
+            // Save language preference
+            if (document.getElementById('language').value) {
+                localStorage.setItem('preferred_language', document.getElementById('language').value);
+            } else {
+                localStorage.removeItem('preferred_language');
+            }
+            updateLanguage();
+        }
+
+        function updateLanguage() {
+            const lang = getLanguage();
+
             if (!translations[lang]) {
-                console.warn(`不支持的语言: ${lang}，默认使用中文`);
-                document.getElementById('language').value = 'en-US';
-                return changeLanguage();
+                lang = default_lang;
             }
             
             document.querySelectorAll('[data-lang]').forEach(element => {
@@ -189,8 +176,6 @@
             if (apList.firstChild) {
                 apList.firstChild.textContent = translations[lang].select_wifi;
             }
-            // Save language preference
-            localStorage.setItem('preferred_language', lang);
         }
 
         function renderSavedList(data) {
@@ -259,7 +244,7 @@
             fetch('/scan')
                 .then(response => response.json())
                 .then(data => {
-                    const lang = document.getElementById('language').value;
+                    const lang = getLanguage();
                     const apList = document.getElementById('ap_list');
                     apList.innerHTML = '<p>' + translations[lang].select_wifi + '</p>';
                     data.forEach(ap => {
@@ -305,14 +290,16 @@
 
         // Set initial language
         document.addEventListener('DOMContentLoaded', () => {
-            // 从 URL 参数中获取语言设置
-            const urlParams = new URLSearchParams(window.location.search);
-            const langParam = urlParams.get('lang');
-            
-            // 优先使用 URL 参数的语言设置，其次是本地存储的设置，最后默认使用中文
-            const savedLang = langParam || localStorage.getItem('preferred_language') || 'en-US';
-            document.getElementById('language').value = savedLang;
-            changeLanguage();
+
+            const lang_select = document.getElementById('language')
+            for (const [id, name] of Object.entries(languages_select)) {
+                var opt = document.createElement('option');
+                opt.value = id;
+                opt.innerHTML = name;
+                lang_select.appendChild(opt);
+            }
+
+            updateLanguage();
             loadSavedList();
             loadAPList();
         });
@@ -340,8 +327,8 @@
             };
 
             try {
-                const lang = document.getElementById('language').value;
-                const response = await fetch('/submit?lang=' + lang, {
+                const lang = getLanguage();
+                const response = await fetch('/submit', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -351,12 +338,16 @@
 
                 const data = await response.json();
                 if (!data.success) {
-                    throw new Error(data.error || translations[lang]["connection_failed"]);
+                    var error_id = data.error;
+                    if (translations[lang].hasOwnProperty(error_id)) {
+                        error_id = translations[lang][data.error]
+                    }
+                    throw new Error(error_id || translations[lang]["connection_failed"]);
                 }
 
                 // 连接成功，跳转到完成页面
                 button.disabled = false;
-                window.location.href = '/done.html';
+                window.location.href = '/done.html?lang=' + lang;
             } catch (err) {
                 error.textContent = err.message;
                 button.disabled = false;
@@ -382,6 +373,59 @@
                 return false;
             }
         }
+
+        function getLanguage() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const langParam = urlParams.get('lang');
+            
+            const requestedLang = langParam || document.getElementById('language').value || localStorage.getItem('preferred_language');
+            if (requestedLang) {
+                return requestedLang;
+            }
+
+            var nav = window.navigator,
+                browserLanguagePropertyKeys = ['language', 'browserLanguage', 'systemLanguage', 'userLanguage'],
+                i,
+                language,
+                len,
+                shortLanguage = null;
+
+            // support for HTML 5.1 "navigator.languages"
+            if (Array.isArray(nav.languages)) {
+                for (i = 0; i < nav.languages.length; i++) {
+                    language = nav.languages[i];
+                    len = language.length;
+                    if (!shortLanguage && len && translations[language]) {
+                        shortLanguage = language;
+                    }
+                    if (language && len>2 && translations[language]) {
+                        return language;
+                    }
+                }
+            }
+
+            // support for other well known properties in browsers
+            for (i = 0; i < browserLanguagePropertyKeys.length; i++) {
+                language = nav[browserLanguagePropertyKeys[i]];
+                //skip this loop iteration if property is null/undefined.  IE11 fix.
+                if (language == null) { continue; } 
+                len = language.length;
+                if (!shortLanguage && len && translations[language]) {
+                    shortLanguage = language;
+                }
+                if (language && len > 2 && translations[language]) {
+                    return language;
+                }
+            }
+
+            if (shortLanguage) {
+                return shortLanguage;
+            }
+
+            return default_lang;
+        }
+
+
     </script>
 </body>
 </html>

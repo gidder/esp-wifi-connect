@@ -40,7 +40,6 @@ class WifiConfigurationAp {
 public:
     static WifiConfigurationAp& GetInstance();
     void SetSsidPrefix(const std::string &&ssid_prefix);
-    void SetLanguage(const std::string &&language);
     void Start();
     void Stop();
     void StartSmartConfig();
@@ -62,7 +61,6 @@ private:
     httpd_handle_t server_ = NULL;
     EventGroupHandle_t event_group_;
     std::string ssid_prefix_;
-    std::string language_;
     esp_event_handler_instance_t instance_any_id_;
     esp_event_handler_instance_t instance_got_ip_;
     esp_timer_handle_t scan_timer_ = nullptr;
