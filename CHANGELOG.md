@@ -1,6 +1,24 @@
 
 # Changelog
 
+## [2.4.0] - 2025-06-08
+
+### Added
+
+- Detect browser language
+- Option to define default language (if desired translation does not exist)
+- Add languages:
+  - Čeština
+  - 日本語
+  - 한국어
+  - Slovenčina
+  - 繁體中文
+
+### Changed
+
+- Language agnostic backend
+- All translations in one place - wifi_languages.js
+
 ## [2.3.8] - 2025-05-18
 
 ### Added
