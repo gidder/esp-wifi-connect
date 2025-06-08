@@ -9,6 +9,7 @@ idf_component_register(
     EMBED_TXTFILES
         "assets/wifi_configuration.html"
         "assets/wifi_configuration_done.html"
+        "assets/wifi_languages.js"
     REQUIRES
     	"esp_timer"
         "esp_http_server"

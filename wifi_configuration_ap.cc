@@ -24,6 +24,7 @@
 
 extern const char index_html_start[] asm("_binary_wifi_configuration_html_start");
 extern const char done_html_start[] asm("_binary_wifi_configuration_done_html_start");
+extern const char languages_js_start[] asm("_binary_wifi_languages_js_start");
 
 WifiConfigurationAp& WifiConfigurationAp::GetInstance() {
     static WifiConfigurationAp instance;
@@ -33,7 +34,6 @@ WifiConfigurationAp& WifiConfigurationAp::GetInstance() {
 WifiConfigurationAp::WifiConfigurationAp()
 {
     event_group_ = xEventGroupCreate();
-    language_ = "en-US";
     ssid_prefix_ = "ESP32";
 }
 
@@ -53,11 +53,6 @@ WifiConfigurationAp::~WifiConfigurationAp()
     if (instance_got_ip_) {
         esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip_);
     }
-}
-
-void WifiConfigurationAp::SetLanguage(const std::string &&language)
-{
-    language_ = language;
 }
 
 void WifiConfigurationAp::SetSsidPrefix(const std::string &&ssid_prefix)
@@ -339,15 +334,8 @@ void WifiConfigurationAp::StartWebServer()
 
             auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
             if (!cJSON_IsString(ssid_item) || (ssid_item->valuestring == NULL) || (strlen(ssid_item->valuestring) >= 33)) {
-                std::string error_str = "";
-                if (this_->language_ == "zh-CN") {
-                    error_str = "\"无效的 SSID\"";
-                } else {
-                    error_str = "\"Invalid SSID\"";
-                }
-
                 cJSON_Delete(json);
-                httpd_resp_send(req, ("{\"success\":false,\"error\":" + error_str + "}").c_str(), HTTPD_RESP_USE_STRLEN);
+                httpd_resp_send(req, "{\"success\":false,\"error\":\"invalid_ssid\"}", HTTPD_RESP_USE_STRLEN);
                 return ESP_OK;
             }
 
@@ -359,14 +347,8 @@ void WifiConfigurationAp::StartWebServer()
 
             // 获取当前对象
             if (!this_->ConnectToWifi(ssid_str, password_str)) {
-                std::string error_str = "";
-                if (this_->language_ == "zh-CN") {
-                    error_str = "\"无法连接到 WiFi\"";
-                } else {
-                    error_str = "\"Unable to connect to WiFi\"";
-                }
                 cJSON_Delete(json);
-                httpd_resp_send(req, ("{\"success\":false,\"error\":" + error_str + "}").c_str(), HTTPD_RESP_USE_STRLEN);
+                httpd_resp_send(req, "{\"success\":false,\"error\":\"unable_connect\"}", HTTPD_RESP_USE_STRLEN);
                 return ESP_OK;
             }
 
@@ -392,6 +374,19 @@ void WifiConfigurationAp::StartWebServer()
         .user_ctx = NULL
     };
     ESP_ERROR_CHECK(httpd_register_uri_handler(server_, &done_html));
+
+    // Register the languages.js page
+    httpd_uri_t languages_js = {
+        .uri = "/languages.js",
+        .method = HTTP_GET,
+        .handler = [](httpd_req_t *req) -> esp_err_t {
+            httpd_resp_set_type(req, "text/javascript");
+            httpd_resp_send(req, languages_js_start, strlen(languages_js_start));
+            return ESP_OK;
+        },
+        .user_ctx = NULL
+    };
+    ESP_ERROR_CHECK(httpd_register_uri_handler(server_, &languages_js));
 
     // Register the reboot endpoint
     httpd_uri_t reboot = {
@@ -430,7 +425,7 @@ void WifiConfigurationAp::StartWebServer()
 
     auto captive_portal_handler = [](httpd_req_t *req) -> esp_err_t {
         auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
-        std::string url = this_->GetWebServerUrl() + "/?lang=" + this_->language_;
+        std::string url = this_->GetWebServerUrl();
         // Set content type to prevent browser warnings
         httpd_resp_set_type(req, "text/html");
         httpd_resp_set_status(req, "302 Found");
