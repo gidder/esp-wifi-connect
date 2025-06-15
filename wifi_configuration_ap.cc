@@ -331,6 +331,7 @@ void WifiConfigurationAp::StartWebServer()
 
             cJSON *ssid_item = cJSON_GetObjectItemCaseSensitive(json, "ssid");
             cJSON *password_item = cJSON_GetObjectItemCaseSensitive(json, "password");
+            cJSON *authmode_item = cJSON_GetObjectItemCaseSensitive(json, "authmode");
 
             auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
             if (!cJSON_IsString(ssid_item) || (ssid_item->valuestring == NULL) || (strlen(ssid_item->valuestring) >= 33)) {
@@ -345,14 +346,22 @@ void WifiConfigurationAp::StartWebServer()
                 password_str = password_item->valuestring;
             }
 
+            if (!cJSON_IsNumber(authmode_item)) {
+                cJSON_Delete(json);
+                httpd_resp_send(req, "{\"success\":false,\"error\":\"invalid_authmode\"}", HTTPD_RESP_USE_STRLEN);
+                return ESP_OK;
+            }
+            // TODO: compare authmode with ap_records_
+            wifi_auth_mode_t authmode = static_cast<wifi_auth_mode_t>(authmode_item->valueint);
+
             // 获取当前对象
-            if (!this_->ConnectToWifi(ssid_str, password_str)) {
+            if (!this_->ConnectToWifi(ssid_str, password_str, authmode)) {
                 cJSON_Delete(json);
                 httpd_resp_send(req, "{\"success\":false,\"error\":\"unable_connect\"}", HTTPD_RESP_USE_STRLEN);
                 return ESP_OK;
             }
 
-            this_->Save(ssid_str, password_str);
+            this_->Save(ssid_str, password_str, authmode);
             cJSON_Delete(json);
             // 设置成功响应
             httpd_resp_set_type(req, "application/json");
@@ -462,7 +471,7 @@ void WifiConfigurationAp::StartWebServer()
     ESP_LOGI(TAG, "Web server started");
 }
 
-bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::string &password)
+bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::string &password, wifi_auth_mode_t authmode)
 {
     if (ssid.empty()) {
         ESP_LOGE(TAG, "SSID cannot be empty");
@@ -488,6 +497,7 @@ bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::stri
     bzero(&wifi_config, sizeof(wifi_config));
     strlcpy((char *)wifi_config.sta.ssid, ssid.c_str(), 32);
     strlcpy((char *)wifi_config.sta.password, password.c_str(), 64);
+    wifi_config.sta.threshold.authmode = authmode;
     wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
     wifi_config.sta.failure_retry_cnt = 1;
     
@@ -516,10 +526,10 @@ bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::stri
     }
 }
 
-void WifiConfigurationAp::Save(const std::string &ssid, const std::string &password)
+void WifiConfigurationAp::Save(const std::string &ssid, const std::string &password, wifi_auth_mode_t authmode)
 {
     ESP_LOGI(TAG, "Save SSID %s %d", ssid.c_str(), ssid.length());
-    SsidManager::GetInstance().AddSsid(ssid, password);
+    SsidManager::GetInstance().AddSsid(ssid, password, authmode);
 }
 
 void WifiConfigurationAp::WifiEventHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
@@ -623,7 +633,11 @@ void WifiConfigurationAp::SmartConfigEventHandler(void *arg, esp_event_base_t ev
             memcpy(password, evt->password, sizeof(evt->password));
             ESP_LOGI(TAG, "SmartConfig SSID: %s, Password: %s", ssid, password);
             // 尝试连接WiFi会失败，故不连接
-            self->Save(ssid, password);
+            wifi_auth_mode_t authmode = WIFI_AUTH_WPA2_PSK;
+            if (strlen(password) == 0) {
+                authmode = WIFI_AUTH_OPEN;
+            }
+            self->Save(ssid, password, authmode);
             xTaskCreate([](void *ctx){
                 ESP_LOGI(TAG, "Restarting in 3 second");
                 vTaskDelay(pdMS_TO_TICKS(3000));

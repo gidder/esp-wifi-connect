@@ -3,10 +3,12 @@
 
 #include <string>
 #include <vector>
+#include <esp_wifi_types_generic.h>
 
 struct SsidItem {
     std::string ssid;
     std::string password;
+    wifi_auth_mode_t authmode;
 };
 
 class SsidManager {
@@ -16,7 +18,7 @@ public:
         return instance;
     }
 
-    void AddSsid(const std::string& ssid, const std::string& password);
+    void AddSsid(const std::string& ssid, const std::string& password, wifi_auth_mode_t authmode);
     void RemoveSsid(int index);
     void SetDefaultSsid(int index);
     void Clear();

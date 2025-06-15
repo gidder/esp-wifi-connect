@@ -130,6 +130,7 @@
             <p>
                 <label for="password" data-lang="password">Password:</label>
                 <input type="password" id="password" name="password">
+                <input type="hidden" id="authmode" name="authmode">
             </p>
             <p style="text-align: center;">
                 <input type="submit" value="Connect" id="button" data-lang-value="connect">
@@ -263,6 +264,7 @@
                             ap_name.href = '#';
                             ap_name.addEventListener('click', () => {
                                 ssid.value = ap.ssid;
+                                document.getElementById('authmode').value = ap.authmode;
                             });
                         }
                         line.appendChild(ap_name);
@@ -320,10 +322,12 @@
 
             const ssidValue = ssid.value;
             const passwordValue = document.getElementById('password').value;
+            const authmodeValue = document.getElementById('authmode').value;
 
             const payload = {
                 ssid: ssidValue,
-                password: passwordValue
+                password: passwordValue,
+                authmode: Number(authmodeValue),
             };
 
             try {
