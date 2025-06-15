@@ -1,6 +1,12 @@
 
 # Changelog
 
+## [2.5.0] - 2025-06-22
+
+### Added
+
+- Save authmode to protect from Wi-Fi security downgrade attack
+
 ## [2.4.0] - 2025-06-08
 
 ### Added

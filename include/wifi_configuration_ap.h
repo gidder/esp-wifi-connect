@@ -70,8 +70,8 @@ private:
 
     void StartAccessPoint();
     void StartWebServer();
-    bool ConnectToWifi(const std::string &ssid, const std::string &password);
-    void Save(const std::string &ssid, const std::string &password);
+    bool ConnectToWifi(const std::string &ssid, const std::string &password, wifi_auth_mode_t authmode);
+    void Save(const std::string &ssid, const std::string &password, wifi_auth_mode_t authmode);
 
     // Event handlers
     static void WifiEventHandler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
