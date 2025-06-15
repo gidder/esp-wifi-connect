@@ -30,9 +30,9 @@ WifiStation::~WifiStation() {
     vEventGroupDelete(event_group_);
 }
 
-void WifiStation::AddAuth(const std::string &&ssid, const std::string &&password) {
+void WifiStation::AddAuth(const std::string &&ssid, const std::string &&password, wifi_auth_mode_t authmode) {
     auto& ssid_manager = SsidManager::GetInstance();
-    ssid_manager.AddSsid(ssid, password);
+    ssid_manager.AddSsid(ssid, password, authmode);
 }
 
 void WifiStation::Stop() {
