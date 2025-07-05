@@ -39,10 +39,6 @@ WifiConfigurationAp::WifiConfigurationAp()
 
 WifiConfigurationAp::~WifiConfigurationAp()
 {
-    if (scan_timer_) {
-        esp_timer_stop(scan_timer_);
-        esp_timer_delete(scan_timer_);
-    }
     if (event_group_) {
         vEventGroupDelete(event_group_);
     }
@@ -76,23 +72,6 @@ void WifiConfigurationAp::Start()
 
     StartAccessPoint();
     StartWebServer();
-    
-    // Start scan immediately
-    esp_wifi_scan_start(nullptr, false);
-    // Setup periodic WiFi scan timer
-    esp_timer_create_args_t timer_args = {
-        .callback = [](void* arg) {
-            auto* self = static_cast<WifiConfigurationAp*>(arg);
-            if (!self->is_connecting_) {
-                esp_wifi_scan_start(nullptr, false);
-            }
-        },
-        .arg = this,
-        .dispatch_method = ESP_TIMER_TASK,
-        .name = "wifi_scan_timer",
-        .skip_unhandled_events = true
-    };
-    ESP_ERROR_CHECK(esp_timer_create(&timer_args, &scan_timer_));
 }
 
 std::string WifiConfigurationAp::GetSsid()
@@ -111,8 +90,7 @@ std::string WifiConfigurationAp::GetSsid()
 
 std::string WifiConfigurationAp::GetWebServerUrl()
 {
-    // http://192.168.4.1
-    return "http://192.168.4.1";
+    return "http://" + ssid_prefix_ + ".local";
 }
 
 void WifiConfigurationAp::StartAccessPoint()
@@ -266,6 +244,12 @@ void WifiConfigurationAp::StartWebServer()
         .handler = [](httpd_req_t *req) -> esp_err_t {
             auto *this_ = static_cast<WifiConfigurationAp *>(req->user_ctx);
             std::lock_guard<std::mutex> lock(this_->mutex_aps_);
+
+            int64_t now = esp_timer_get_time();
+            if (this_->is_scanning_ == false) {
+                this_->is_scanning_ = true;
+                esp_wifi_scan_start(nullptr, true);
+            }
 
             // Send the scan results as JSON
             httpd_resp_set_type(req, "application/json");
@@ -456,6 +440,7 @@ void WifiConfigurationAp::StartWebServer()
         "/success.txt",           // Various
         "/portal.html",           // Various
         "/library/test/success.html" // Apple
+        "hotspot-detect.html"        // Apple
     };
 
     for (const auto& url : captive_portal_urls) {
@@ -488,9 +473,8 @@ bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::stri
         return false;
     }
     
-    esp_timer_stop(scan_timer_);
-    is_connecting_ = true;
     esp_wifi_scan_stop();
+    is_connecting_ = true;
     xEventGroupClearBits(event_group_, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT);
 
     wifi_config_t wifi_config;
@@ -506,6 +490,7 @@ bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::stri
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to connect to WiFi: %d", ret);
         is_connecting_ = false;
+        is_scanning_ = true;
         esp_wifi_scan_start(nullptr, false);
         return false;
     }
@@ -521,6 +506,7 @@ bool WifiConfigurationAp::ConnectToWifi(const std::string &ssid, const std::stri
         return true;
     } else {
         ESP_LOGE(TAG, "Failed to connect to WiFi %s", ssid.c_str());
+        is_scanning_ = true;
         esp_wifi_scan_start(nullptr, false);
         return false;
     }
@@ -546,6 +532,7 @@ void WifiConfigurationAp::WifiEventHandler(void* arg, esp_event_base_t event_bas
     } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
         xEventGroupSetBits(self->event_group_, WIFI_FAIL_BIT);
     } else if (event_id == WIFI_EVENT_SCAN_DONE) {
+        self->is_scanning_ = false;
         if (self->is_connecting_) {
             esp_wifi_clear_ap_list();
             return;
@@ -580,8 +567,6 @@ void WifiConfigurationAp::WifiEventHandler(void* arg, esp_event_base_t event_bas
 
         }
         std::sort(self->ap_records_.begin(), self->ap_records_.end(), wifi_ap_record_min_cmp{});
-
-        esp_timer_start_once(self->scan_timer_, 5 * 1000000);
     }
 }
 
@@ -660,13 +645,6 @@ void WifiConfigurationAp::Stop() {
         sc_event_instance_ = nullptr;
     }
     esp_smartconfig_stop();
-
-    // 停止定时器
-    if (scan_timer_) {
-        esp_timer_stop(scan_timer_);
-        esp_timer_delete(scan_timer_);
-        scan_timer_ = nullptr;
-    }
 
     // 停止Web服务器
     if (server_) {
