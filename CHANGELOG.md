@@ -1,6 +1,14 @@
 
 # Changelog
 
+## [2.6.0] - 
+
+### Changed
+
+- Scan new APs only when client is connected:
+  - Client can easier connect to ESP32
+  - Scans are not performed when no needed
+
 ## [2.5.0] - 2025-06-22
 
 ### Added

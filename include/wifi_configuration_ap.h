@@ -63,10 +63,10 @@ private:
     std::string ssid_prefix_;
     esp_event_handler_instance_t instance_any_id_;
     esp_event_handler_instance_t instance_got_ip_;
-    esp_timer_handle_t scan_timer_ = nullptr;
     bool is_connecting_ = false;
     esp_netif_t* ap_netif_ = nullptr;
     std::vector<wifi_ap_record_min_t> ap_records_;
+    bool is_scanning_ = false;
 
     void StartAccessPoint();
     void StartWebServer();
